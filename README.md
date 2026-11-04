@@ -2,6 +2,8 @@
 
 适用于 Windows x64 的好用便签四象限桌面浮窗，使用 Tauri、React 和 Python 开发。读取全部未完成待办，并通过客户端本地同步队列双向同步。
 
+直接使用：[下载最新便携版](https://github.com/AkrenChen/LinkinNotes/releases/latest)。解压完整目录后运行 `LinkinNotes.exe`。
+
 构建后运行 `release/LinkinNotes/LinkinNotes.exe`，请保持同目录的 `sidecar` 文件夹完整。更新版本时，先从托盘菜单退出旧版，再运行新版。
 
 - 先打开并登录好用便签，浮窗自动读取全部未完成任务，不限制月份。
