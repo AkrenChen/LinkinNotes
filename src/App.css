@@ -43,4 +43,4 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }.name-setting { disp
 @media(max-width:650px) { .brand-subtitle { display: none; }.interface { padding: 6px 9px; }.quadrants { gap: 6px; }.quadrant-header { gap: 7px; } }
 @media(prefers-reduced-motion:reduce) { * { transition: none !important; } }
 
-.menu-separator { height: 1px; background: #c9cfd966; margin: 5px 3px; }.context-menu .danger-action { color: #b34c54; }.context-menu .danger-action:hover, .context-menu .danger-action:focus-visible { background: #b34c5410; }.context-menu .danger-action svg { width: 14px; height: 14px; flex-shrink: 0; }.delete-preview { margin: 0 8px 8px; font-size: 12px; line-height: 18px; color: #626f80; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.menu-separator { height: 1px; background: #c9cfd966; margin: 5px 3px; }.context-menu .danger-action { color: #b34c54; }.context-menu .danger-action:hover, .context-menu .danger-action:focus-visible { background: #b34c5410; }.context-menu .danger-action svg { width: 14px; height: 14px; flex-shrink: 0; }

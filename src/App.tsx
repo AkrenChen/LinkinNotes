@@ -6,7 +6,7 @@ import { SettingsPanel, defaults, type Preferences, type Priority } from './Sett
 type Task = { id: string; text: string; priority: Priority; update_at: number; editable: boolean; recurring: boolean };
 type Snapshot = { tasks: Task[]; pending: number; failed: number; account?: string };
 type Draft = { task?: Task; text: string; priority: Priority; account?: string };
-type Context = { x: number; y: number; task?: Task; account?: string; editing?: boolean; confirmingDelete?: boolean };
+type Context = { x: number; y: number; task?: Task; account?: string; editing?: boolean };
 const priorities: Priority[] = ['ui', 'nui', 'uni', 'nuni'];
 const message = (e: unknown) => typeof e === 'string' ? e : e instanceof Error ? e.message : String(e);
 
@@ -157,9 +157,9 @@ export default function App() {
     <footer><span className={`status ${visibleError || snapshot.failed ? 'has-error' : ''}`}><i/>{busy ? '正在处理…' : !loaded ? '正在连接' : snapshot.failed ? `${snapshot.failed} 项同步失败` : snapshot.pending ? `${snapshot.pending} 项等待同步` : '已与好用便签同步'}</span><span>{draft ? 'Enter 保存 · Shift+Enter 换行 · Esc 取消' : '点击编辑 · 右键切换象限或删除'}</span></footer>
     {visibleError && <div className="error-banner" role="alert"><span>{visibleError}</span><button onClick={() => { setError(''); setStartupError(''); void refresh(); }}>重试</button><button aria-label="关闭错误提示" onClick={() => { setError(''); setConnectionError(''); setStartupError(''); }}>×</button></div>}
     {settingsOpen && <SettingsPanel preferences={preferences} onClose={() => setSettingsOpen(false)} onSaved={next => { setPreferences(next); setStartupError(''); setSettingsOpen(false); }}/>}
-    {context && <div className="context-dismiss" onMouseDown={closeContext} onContextMenu={e => { e.preventDefault(); closeContext(); }}><div className="context-menu" ref={menu} role="menu" aria-label={context.confirmingDelete ? '确认删除待办' : '任务操作'} style={{ left: context.x, top: context.y }} onMouseDown={e => e.stopPropagation()} onKeyDown={e => {
+    {context && <div className="context-dismiss" onMouseDown={closeContext} onContextMenu={e => { e.preventDefault(); closeContext(); }}><div className="context-menu" ref={menu} role="menu" aria-label="任务操作" style={{ left: context.x, top: context.y }} onMouseDown={e => e.stopPropagation()} onKeyDown={e => {
       if (e.key === 'Escape') { e.preventDefault(); closeContext(); }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const items = Array.from(menu.current!.querySelectorAll<HTMLButtonElement>('button')); const index = items.indexOf(document.activeElement as HTMLButtonElement); items[(index + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus(); }
-    }}>{context.confirmingDelete ? <><p>删除这条待办？</p><div className="delete-preview">{context.task?.text}</div><button role="menuitem" onClick={closeContext}>取消</button><button role="menuitem" className="danger-action" onClick={deleteTask}><Icon name="trash"/>确认删除</button></> : <><p>移动到象限</p>{priorities.map(p => <button role="menuitem" className={p} key={p} title={preferences.names[p]} onClick={() => move(p)}><i/><span className="menu-label">{preferences.names[p]}</span><span className="menu-check">{p === (context.editing ? draft?.priority : context.task?.priority || draft?.priority) ? '✓' : ''}</span></button>)}{context.task && <><div className="menu-separator" role="separator"/><button role="menuitem" className="danger-action" onClick={() => setContext({ ...context, confirmingDelete: true })}><Icon name="trash"/>删除待办</button></>}</>}</div></div>}
+    }}><p>移动到象限</p>{priorities.map(p => <button role="menuitem" className={p} key={p} title={preferences.names[p]} onClick={() => move(p)}><i/><span className="menu-label">{preferences.names[p]}</span><span className="menu-check">{p === (context.editing ? draft?.priority : context.task?.priority || draft?.priority) ? '✓' : ''}</span></button>)}{context.task && <><div className="menu-separator" role="separator"/><button role="menuitem" className="danger-action" onClick={deleteTask}><Icon name="trash"/>删除待办</button></>}</div></div>}
   </div></main>;
 }
