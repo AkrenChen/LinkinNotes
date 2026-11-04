@@ -10,7 +10,7 @@ type Context = { x: number; y: number; task?: Task; account?: string };
 const priorities: Priority[] = ['ui', 'nui', 'uni', 'nuni'];
 const message = (e: unknown) => typeof e === 'string' ? e : e instanceof Error ? e.message : String(e);
 
-function Icon({ name }: { name: 'pin' | 'refresh' | 'hide' | 'plus' | 'maximize' | 'restore' | 'menu' }) {
+function Icon({ name }: { name: 'pin' | 'refresh' | 'hide' | 'plus' | 'maximize' | 'restore' | 'menu' | 'check' | 'close' }) {
   return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {name === 'pin' && <><path d="M8 3h8l-1 7 3 3v2H6v-2l3-3z"/><path d="M12 15v6"/></>}
     {name === 'refresh' && <><path d="M20 10a8 8 0 1 0-2 8M20 4v6h-6"/></>}
@@ -18,6 +18,8 @@ function Icon({ name }: { name: 'pin' | 'refresh' | 'hide' | 'plus' | 'maximize'
     {name === 'maximize' && <rect x="5" y="5" width="14" height="14" rx="1"/>}
     {name === 'restore' && <><path d="M9 5V3h12v12h-2"/><rect x="3" y="9" width="12" height="12" rx="1"/></>}
     {name === 'menu' && <path d="M4 6h16M4 12h16M4 18h16"/>}
+    {name === 'check' && <path d="m5 12 4 4L19 6"/>}
+    {name === 'close' && <path d="m6 6 12 12M18 6 6 18"/>}
   </svg>;
 }
 
@@ -26,14 +28,14 @@ function InlineEditor({ draft, busy, onChange, onSave, onCancel, onContext }: { 
   useEffect(() => { const input = field.current; if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } }, []);
   useEffect(() => { if (field.current) { field.current.style.height = '0'; field.current.style.height = `${Math.max(24, field.current.scrollHeight)}px`; } }, [draft.text]);
   return <div className="inline-editor" onContextMenu={onContext}>
-    <span className="editor-leading" aria-hidden="true"/>
+    <button className="complete-button editor-checkbox" aria-label="编辑中，请先保存或取消再完成任务" title="先保存或取消编辑，再勾选完成" disabled><span>✓</span></button>
     <textarea ref={field} rows={1} aria-label={draft.task ? '编辑任务内容' : '新任务内容'} value={draft.text} maxLength={10000} disabled={busy} placeholder="输入任务，Enter 保存" onChange={e => onChange(e.target.value)} onKeyDown={e => {
       if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSave(); }
       if (e.key === 'Escape') { e.preventDefault(); if (!busy) onCancel(); }
     }}/>
-    <button className="row-action save-action" aria-label="保存任务" title="保存 · Enter" disabled={busy || !draft.text.trim()} onClick={onSave}>✓</button>
-    <button className="row-action" aria-label="取消编辑" title="取消 · Esc" disabled={busy} onClick={onCancel}>×</button>
+    <div className="editor-actions"><button className="row-action save-action" aria-label="保存任务" title="保存 · Enter" disabled={busy || !draft.text.trim()} onClick={onSave}><Icon name="check"/></button>
+    <button className="row-action" aria-label="取消编辑" title="取消 · Esc" disabled={busy} onClick={onCancel}><Icon name="close"/></button></div>
   </div>;
 }
 
