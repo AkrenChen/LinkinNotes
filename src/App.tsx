@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { SettingsPanel, defaults, type Preferences, type Priority } from './Settings';
 
-type Task = { id: string; text: string; priority: Priority; update_at: number; editable: boolean; recurring: boolean };
+type Task = { id: string; text: string; priority: Priority; update_at: number; revision?: string; editable: boolean; recurring: boolean };
 type Snapshot = { tasks: Task[]; pending: number; failed: number; account?: string };
 type Draft = { task?: Task; text: string; priority: Priority; account?: string };
 type Context = { x: number; y: number; task?: Task; account?: string; editing?: boolean };
@@ -99,13 +99,14 @@ export default function App() {
     } catch (e) { setError(message(e)); }
   }
   function begin(next: Draft) {
+    if (locked.current) return;
     if (draft && draft.text !== (draft.task?.text || '')) { setError('请先保存或取消当前任务。'); return; }
     if (next.task && !next.task.editable) { setError('此任务包含富文本，请在好用便签编辑；右键可切换象限。'); return; }
     setError(''); setDraft(next);
   }
   function save() {
     if (!draft?.text.trim() || busy) return;
-    void mutate('save', { ...(draft.task ? { id: draft.task.id, update_at: draft.task.update_at } : {}), text: draft.text, priority: draft.priority, account: draft.account }, true);
+    void mutate('save', { ...(draft.task ? { id: draft.task.id, update_at: draft.task.update_at, revision: draft.task.revision } : {}), text: draft.text, priority: draft.priority, account: draft.account }, true);
   }
   function openContext(e: React.MouseEvent, task?: Task, editing = false) {
     e.preventDefault(); if (busy) return;
@@ -116,7 +117,7 @@ export default function App() {
   function move(priority: Priority) {
     if (!context) return;
     if ((!context.task || context.editing) && draft) setDraft({ ...draft, priority });
-    else if (context.task) void mutate('save', { id: context.task.id, update_at: context.task.update_at, text: context.task.text, priority, account: context.account });
+    else if (context.task) void mutate('save', { id: context.task.id, update_at: context.task.update_at, revision: context.task.revision, text: context.task.text, priority, account: context.account });
     closeContext();
   }
   function deleteTask() {
@@ -125,7 +126,7 @@ export default function App() {
     closeContext();
     void mutate('delete', { id: task.id, update_at: task.update_at, account }, draft?.task?.id === task.id);
   }
-  const stale = draft?.task && snapshot.tasks.find(t => t.id === draft.task!.id && t.update_at !== draft.task!.update_at);
+  const stale = draft?.task && snapshot.tasks.find(t => t.id === draft.task!.id && (t.revision && draft.task!.revision ? t.revision !== draft.task!.revision : t.update_at !== draft.task!.update_at));
   const visibleError = error || connectionError || startupError;
 
   return <main className={`floating-window ${focused ? 'window-focused' : 'window-unfocused'} ${maximized ? 'maximized' : ''}`}><div className="interface">

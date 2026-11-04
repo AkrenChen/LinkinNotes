@@ -1,10 +1,21 @@
 import json
+import hashlib
 import time
 import uuid
 
 
 def packed(value):
     return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+
+
+def revision(row):
+    try:
+        body = json.loads(row['body'])
+    except (ValueError, TypeError):
+        body = row['body']
+    content = {key: row[key] for key in ('text','priority','constant_pattern')}
+    content['body'] = body
+    return hashlib.sha256(json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
 
 
 class Store:
@@ -15,6 +26,7 @@ class Store:
     def tasks(self):
         rows = self.db.query("SELECT local_item_id AS id,text,priority,update_at,body,constant_pattern FROM user_todo_items WHERE delete_at=0 AND done='off' AND closed='off' ORDER BY top_at DESC,sort DESC")
         for row in rows:
+            row['revision'] = revision(row)
             try:
                 row['editable'] = all(part.get('type') == 0 for part in json.loads(row.pop('body'))['content'])
             except (KeyError, ValueError, TypeError):
@@ -44,9 +56,11 @@ class Store:
         task_id = p.get('id')
         if task_id:
             rows = self.db.query("SELECT * FROM user_todo_items WHERE local_item_id=? AND delete_at=0 AND done='off' AND closed='off'", (task_id,))
-            if not rows or rows[0]['update_at'] != p.get('update_at'):
+            if not rows:
                 raise ValueError('任务已在好用便签中变化，请刷新后重试；当前输入已保留。')
             row = rows[0]
+            if row['update_at'] != p.get('update_at') and not (method == 'save' and p.get('revision') == revision(row)):
+                raise ValueError('任务已在好用便签中变化，请刷新后重试；当前输入已保留。')
         elif method in ('complete','delete'):
             raise ValueError('缺少任务编号')
         if method == 'delete':

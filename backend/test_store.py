@@ -57,6 +57,60 @@ class StoreTests(unittest.TestCase):
         expected=self.db.query("SELECT count(*) AS n FROM user_todo_items WHERE delete_at=0 AND done='off' AND closed='off'")[0]['n']
         self.assertEqual(len(self.store.tasks()['tasks']),expected)
 
+    def test_sync_timestamp_change_does_not_block_edit(self):
+        task=self.store.tasks()['tasks'][0]
+        self.db.query('UPDATE user_todo_items SET update_at=? WHERE local_item_id=?',(task['update_at']+325509,task['id']))
+        self.store.mutate('save',dict(task,text='Edit after sync acknowledgement'))
+        current=next(t for t in self.store.tasks()['tasks'] if t['id']==task['id'])
+        self.assertEqual(current['text'],'Edit after sync acknowledgement')
+
+    def test_revision_still_rejects_real_changes_and_missing_baseline(self):
+        for column,value in [('text','Changed elsewhere'),('priority','nuni'),('body',json.dumps({'version':'101','content':[{'type':0,'text':'Changed body'}]})),('constant_pattern','changed recurrence')]:
+            with self.subTest(column=column):
+                task=next(t for t in self.store.tasks()['tasks'] if t['priority']=='ui')
+                before=self.db.query('SELECT * FROM user_todo_items WHERE local_item_id=?',(task['id'],))[0]
+                self.db.query('UPDATE user_todo_items SET '+column+'=?,update_at=? WHERE local_item_id=?',(value,task['update_at']+1,task['id']))
+                with self.assertRaisesRegex(ValueError,'任务已'):
+                    self.store.mutate('save',dict(task,text='Must not overwrite'))
+                self.db.query('UPDATE user_todo_items SET '+column+'=?,update_at=? WHERE local_item_id=?',(before[column],before['update_at'],task['id']))
+        task=self.store.tasks()['tasks'][0]
+        self.db.query('UPDATE user_todo_items SET update_at=? WHERE local_item_id=?',(task['update_at']+1,task['id']))
+        task.pop('revision',None)
+        with self.assertRaisesRegex(ValueError,'任务已'):
+            self.store.mutate('save',dict(task,text='No baseline'))
+        self.assertEqual(self.db.query('SELECT count(*) AS n FROM operations_v1')[0]['n'],0)
+
+    def test_move_then_sync_then_edit_preserves_priority(self):
+        task=next(t for t in self.store.tasks()['tasks'] if t['priority']=='ui')
+        self.store.mutate('save',dict(task,priority='nui'))
+        moved=next(t for t in self.store.tasks()['tasks'] if t['id']==task['id'])
+        self.db.query('UPDATE user_todo_items SET update_at=? WHERE local_item_id=?',(moved['update_at']+325509,task['id']))
+        self.store.mutate('save',dict(moved,text='Edited after moving'))
+        current=next(t for t in self.store.tasks()['tasks'] if t['id']==task['id'])
+        self.assertEqual(current['priority'],'nui')
+        self.assertEqual(current['text'],'Edited after moving')
+        self.assertEqual([r['operation'] for r in self.db.query('SELECT operation FROM operations_v1 ORDER BY id')],['user_todo_item_modify_priority','user_todo_item_modify_content'])
+
+    def test_sync_body_formatting_does_not_cause_false_conflict(self):
+        task=self.store.tasks()['tasks'][0]
+        body=self.db.query('SELECT body FROM user_todo_items WHERE local_item_id=?',(task['id'],))[0]['body']
+        reformatted=json.dumps(json.loads(body),sort_keys=True,indent=2)
+        self.db.query('UPDATE user_todo_items SET body=?,update_at=? WHERE local_item_id=?',(reformatted,task['update_at']+1,task['id']))
+        current=next(t for t in self.store.tasks()['tasks'] if t['id']==task['id'])
+        self.assertEqual(current['revision'],task['revision'])
+        self.store.mutate('save',dict(task,text='Edit after formatting normalization'))
+
+    def test_matching_revision_never_revives_inactive_tasks(self):
+        for column,value in [('done','on'),('closed','on'),('delete_at',100)]:
+            with self.subTest(column=column):
+                task=self.store.tasks()['tasks'][0]
+                before=self.db.query('SELECT * FROM user_todo_items WHERE local_item_id=?',(task['id'],))[0]
+                self.db.query('UPDATE user_todo_items SET '+column+'=?,update_at=? WHERE local_item_id=?',(value,task['update_at']+1,task['id']))
+                with self.assertRaisesRegex(ValueError,'任务已'):
+                    self.store.mutate('save',dict(task,text='Must not revive task'))
+                self.db.query('UPDATE user_todo_items SET '+column+'=?,update_at=? WHERE local_item_id=?',(before[column],before['update_at'],task['id']))
+        self.assertEqual(self.db.query('SELECT count(*) AS n FROM operations_v1')[0]['n'],0)
+
     def test_delete_preserves_row_and_queues_native_operation(self):
         baseline=self.db.query('SELECT * FROM user_todo_items ORDER BY local_item_id')
         task=self.store.tasks()['tasks'][0]
