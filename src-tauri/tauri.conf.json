@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LinkinNotes",
+  "version": "0.3.2",
+  "identifier": "local.linkin.notes",
+  "build": { "frontendDist": "../dist", "devUrl": "http://localhost:1420" },
+  "app": {
+    "windows": [{ "title": "四象限待办", "width": 780, "height": 580, "minWidth": 620, "minHeight": 440, "transparent": true, "decorations": false, "alwaysOnTop": true, "skipTaskbar": true, "shadow": false }],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost" }
+  },
+  "bundle": { "active": false, "resources": ["sidecar/linkin-backend.exe"] }
+}
