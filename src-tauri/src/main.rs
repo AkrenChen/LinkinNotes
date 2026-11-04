@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use tauri_plugin_global_shortcut::ShortcutState;
 mod preferences;
 mod appearance;
+mod shadow_geometry;
 mod client_start_state;
 mod client_startup;
 
@@ -83,8 +84,14 @@ fn main() {
         .invoke_handler(tauri::generate_handler![rpc,toggle_pin,hide_window,toggle_maximize,preferences::get_settings,preferences::save_settings])
         .setup(|app| {
             let window=app.get_webview_window("main").unwrap();
-            appearance::refresh(&window.as_ref().window());
             preferences::initialize(app.handle())?;
+            if let Err(error)=appearance::initialize(&window.as_ref().window()) {
+                let state=app.state::<preferences::PreferenceState>();
+                if let Ok(mut status)=state.2.lock() {
+                    let error=format!("窗口阴影初始化失败，请重启浮窗：{error}");
+                    *status=Some(status.take().map(|previous| format!("{previous}；{error}")).unwrap_or(error));
+                };
+            }
             let show=MenuItem::with_id(app,"show","显示四象限",true,None::<&str>)?;
             let quit=MenuItem::with_id(app,"quit","退出",true,None::<&str>)?;
             let menu=Menu::with_items(app,&[&show,&quit])?;
@@ -97,7 +104,6 @@ fn main() {
         })
         .on_window_event(|window,event| {match event {
             tauri::WindowEvent::CloseRequested{api,..} => {api.prevent_close();let _=window.hide();},
-            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged{..} => appearance::refresh(window),
             _ => {}
         }})
         .build(tauri::generate_context!()).expect("启动四象限待办失败")
