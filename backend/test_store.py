@@ -57,5 +57,45 @@ class StoreTests(unittest.TestCase):
         expected=self.db.query("SELECT count(*) AS n FROM user_todo_items WHERE delete_at=0 AND done='off' AND closed='off'")[0]['n']
         self.assertEqual(len(self.store.tasks()['tasks']),expected)
 
+    def test_delete_preserves_row_and_queues_native_operation(self):
+        baseline=self.db.query('SELECT * FROM user_todo_items ORDER BY local_item_id')
+        task=self.store.tasks()['tasks'][0]
+        self.store.mutate('delete',task)
+        self.assertNotIn(task['id'],[t['id'] for t in self.store.tasks()['tasks']])
+        row=self.db.query('SELECT * FROM user_todo_items WHERE local_item_id=?',(task['id'],))[0]
+        self.assertGreater(row['delete_at'],0)
+        self.assertGreater(row['delete_at'],10**15)
+        before=next(r for r in baseline if r['local_item_id']==task['id'])
+        self.assertEqual({**before,'delete_at':row['delete_at']},row)
+        operation=self.db.query('SELECT * FROM operations_v1')[0]
+        self.assertEqual(operation['operation'],'user_todo_items_delete')
+        self.assertEqual(json.loads(operation['operation_details']),{'delete_at':row['delete_at'],'local_item_ids':[{'local_item_id':task['id']}]})
+        self.assertEqual(json.loads(operation['related_object_opr_infos']),{'opr_infos':[{'obj_type':4,'obj_id':task['id'],'opr_type':2}]})
+        self.assertEqual(operation['operation_state'],'wait_sync')
+        self.assertLess(operation['operation_at'],10**11)
+        self.assertEqual([r for r in baseline if r['local_item_id']!=task['id']],self.db.query('SELECT * FROM user_todo_items WHERE local_item_id!=? ORDER BY local_item_id',(task['id'],)))
+        self.assertEqual(self.db.query('SELECT count(*) AS n FROM search_user_todo_items_fts WHERE search_user_todo_items_fts MATCH ?',('Synthetic',))[0]['n'],len(baseline)-1)
+        self.assertEqual(self.db.query('PRAGMA integrity_check')[0]['integrity_check'],'ok')
+
+    def test_delete_rejects_stale_or_missing_task(self):
+        task=self.store.tasks()['tasks'][0]
+        self.store.mutate('save',dict(task,text='Modified in client'))
+        count=self.db.query('SELECT count(*) AS n FROM operations_v1')[0]['n']
+        with self.assertRaisesRegex(ValueError,'任务已'):
+            self.store.mutate('delete',task)
+        with self.assertRaisesRegex(ValueError,'缺少任务编号'):
+            self.store.mutate('delete',{})
+        self.assertEqual(self.db.query('SELECT count(*) AS n FROM operations_v1')[0]['n'],count)
+
+    def test_delete_queue_failure_rolls_back_marker_and_index(self):
+        task=self.store.tasks()['tasks'][0]
+        before=self.db.query('SELECT * FROM user_todo_items WHERE local_item_id=?',(task['id'],))
+        self.db.query("CREATE TRIGGER fail_queue BEFORE INSERT ON operations_v1 BEGIN SELECT RAISE(ABORT,'test failure'); END")
+        with self.assertRaises(RuntimeError):
+            self.store.mutate('delete',task)
+        self.assertEqual(self.db.query('SELECT * FROM user_todo_items WHERE local_item_id=?',(task['id'],)),before)
+        self.assertIn(task['id'],[t['id'] for t in self.store.tasks()['tasks']])
+        self.assertEqual(self.db.query('SELECT count(*) AS n FROM search_user_todo_items_fts WHERE search_user_todo_items_fts MATCH ?',('Synthetic',))[0]['n'],5)
+
 
 if __name__=='__main__': unittest.main()

@@ -89,7 +89,7 @@ class Service:
             result=self.store.tasks()
             result['account']=self.store.identity['user_id']
             return result
-        if method not in ('save','complete'): raise ValueError('未知操作')
+        if method not in ('save','complete','delete'): raise ValueError('未知操作')
         if params.get('account') != self.store.identity['user_id']:
             raise ValueError('好用便签账号已变化，请刷新后重新打开编辑框。')
         return self.store.mutate(method,params)

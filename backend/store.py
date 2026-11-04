@@ -23,8 +23,8 @@ class Store:
         states = self.db.query("SELECT operation_state,count(*) AS count FROM operations_v1 WHERE operation_state IN ('wait_sync','syncing','failed') GROUP BY operation_state")
         return {'tasks': rows, 'pending': sum(r['count'] for r in states if r['operation_state'] != 'failed'), 'failed': sum(r['count'] for r in states if r['operation_state'] == 'failed')}
 
-    def queue(self, name, task_id, details, creating=False):
-        related = {'opr_infos': [{'obj_type': 4, 'obj_id': task_id, 'opr_type': 0 if creating else 1}]}
+    def queue(self, name, task_id, details, creating=False, deleting=False):
+        related = {'opr_infos': [{'obj_type': 4, 'obj_id': task_id, 'opr_type': 2 if deleting else 0 if creating else 1}]}
         self.db.query('INSERT INTO operations_v1 (data_version,related_object_opr_infos,operation,operation_details,operation_state,operation_id,operater,operation_at,why_failed) VALUES (?,?,?,?,?,?,?,?,?)', ('101', packed(related), name, packed(details), 'wait_sync', str(uuid.uuid4()), self.identity['user_id'], int(time.time()), ''))
 
     def mutate(self, method, params):
@@ -38,6 +38,8 @@ class Store:
             raise
 
     def _mutate(self, method, p):
+        if method not in ('save','complete','delete'):
+            raise ValueError('未知操作')
         now = time.time_ns() // 1000
         task_id = p.get('id')
         if task_id:
@@ -45,8 +47,12 @@ class Store:
             if not rows or rows[0]['update_at'] != p.get('update_at'):
                 raise ValueError('任务已在好用便签中变化，请刷新后重试；当前输入已保留。')
             row = rows[0]
-        elif method == 'complete':
+        elif method in ('complete','delete'):
             raise ValueError('缺少任务编号')
+        if method == 'delete':
+            self.db.query('UPDATE user_todo_items SET delete_at=? WHERE local_item_id=?',(now,task_id))
+            self.queue('user_todo_items_delete',task_id,{'delete_at':now,'local_item_ids':[{'local_item_id':task_id}]},deleting=True)
+            return {'id':task_id}
         if method == 'complete':
             if row['constant_pattern']:
                 raise ValueError('重复任务请在好用便签中完成，以保留下一次提醒。')
