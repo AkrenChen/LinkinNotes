@@ -67,7 +67,7 @@ export default function App() {
     void win.isFocused().then(v => { if (!disposed) setFocused(v); });
     void win.isMaximized().then(v => { if (!disposed) setMaximized(v); });
     void win.isAlwaysOnTop().then(v => { if (!disposed) setPinned(v); });
-    void invoke<{ settings: Preferences; shortcutError?: string }>('get_settings').then(result => { if (!disposed) { setPreferences(result.settings); setStartupError(result.shortcutError || ''); } }).catch(e => { if (!disposed) setError(message(e)); });
+    void invoke<{ settings: Preferences; shortcutError?: string; startupError?: string }>('get_settings').then(result => { if (!disposed) { setPreferences(result.settings); setStartupError([result.shortcutError, result.startupError].filter(Boolean).join('；')); } }).catch(e => { if (!disposed) setError(message(e)); });
     return () => { disposed = true; for (const listener of listeners) void listener.then(unlisten => unlisten()); };
   }, []);
   useEffect(() => { if (!focused) setContext(null); }, [focused]);

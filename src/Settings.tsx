@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 export type Priority = 'ui' | 'nui' | 'uni' | 'nuni';
-export type Preferences = { shortcut: string; names: Record<Priority, string> };
-export const defaults: Preferences = { shortcut: 'Ctrl+Alt+Q', names: { ui: '重要且紧急', nui: '重要不紧急', uni: '紧急不重要', nuni: '不重要不紧急' } };
+export type Preferences = { shortcut: string; names: Record<Priority, string>; followClient: boolean };
+export const defaults: Preferences = { shortcut: 'Ctrl+Alt+Q', followClient: false, names: { ui: '重要且紧急', nui: '重要不紧急', uni: '紧急不重要', nuni: '不重要不紧急' } };
 
 export function SettingsPanel({ preferences, onClose, onSaved }: { preferences: Preferences; onClose: () => void; onSaved: (next: Preferences) => void }) {
   const [settings, setSettings] = useState<Preferences>({ ...preferences, names: { ...preferences.names } });
@@ -22,6 +22,8 @@ export function SettingsPanel({ preferences, onClose, onSaved }: { preferences: 
       if (e.key === 'Tab') { const items = Array.from(panel.current!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')); const first = items[0], last = items[items.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } }
     }}>
       <header><h2 id="settings-title">设置</h2><button className="icon-button" aria-label="关闭设置" disabled={busy} onClick={onClose}>×</button></header>
+      <div className="setting-toggle-row"><span id="follow-client-label">跟随好用便签启动</span><button type="button" role="switch" className="capsule-switch" aria-checked={settings.followClient} aria-labelledby="follow-client-label" aria-describedby="follow-client-help" disabled={busy} onClick={() => setSettings({ ...settings, followClient: !settings.followClient })}><span/></button></div>
+      <p id="follow-client-help" className="setting-help startup-help">登录 Windows 后在后台待命，好用便签启动时自动打开浮窗。关闭好用便签不退出浮窗。</p>
       <label>显示 / 隐藏快捷键</label>
       <button ref={recorder} className={`shortcut-recorder ${recording ? 'recording' : ''}`} disabled={busy} onClick={() => { setRecording(true); recorder.current?.focus(); }} onBlur={() => setRecording(false)} onKeyDown={e => {
         if (!recording) return;

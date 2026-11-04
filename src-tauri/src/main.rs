@@ -6,6 +6,8 @@ use serde_json::{json, Value};
 use tauri_plugin_global_shortcut::ShortcutState;
 mod preferences;
 mod appearance;
+mod client_start_state;
+mod client_startup;
 
 struct Bridge { child: Child, input: ChildStdin, output: BufReader<ChildStdout> }
 impl Drop for Bridge { fn drop(&mut self) { let _ = self.child.kill(); } }
@@ -63,8 +65,9 @@ async fn rpc(app: tauri::AppHandle, backend: State<'_, Backend>, method: String,
 }
 
 fn main() {
+    if client_startup::run_if_requested() { return; }
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app,_,_| { if let Some(w)=app.get_webview_window("main") { let _=w.show(); let _=w.set_focus(); } }))
+        .plugin(tauri_plugin_single_instance::init(|app,args,_| { if let Some(w)=app.get_webview_window("main") { let _=w.show(); let _=w.unminimize(); if !args.iter().any(|arg| arg == "--client-started") { let _=w.set_focus(); } } }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app,_,event| {
             if event.state == ShortcutState::Pressed {
                 if let Some(window)=app.get_webview_window("main") {
